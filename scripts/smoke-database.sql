@@ -15,7 +15,7 @@ declare
   v_rejected boolean;
   v_key_hash text;
   v_admin_key text := 'ci-admin-key-0123456789abcdef0123456789';
-  v_edit_key text := 'ci-board-edit-key-0123456789';
+  v_edit_key text := '1';
   v_payload jsonb := '{
     "title": "CI boundary smoke",
     "category": "검증",
@@ -65,6 +65,12 @@ begin
   if public.verify_tier_admin('invalid-admin-key') then
     raise exception 'invalid admin key was accepted';
   end if;
+  if not public.verify_tier_board_key(
+    (select id from public.tier_boards where slug = 'space-movie-scores'),
+    '1234'
+  ) then
+    raise exception 'movie seed edit key was rejected';
+  end if;
 
   perform pg_catalog.set_config('request.jwt.claim.sub', v_owner::text, true);
 
@@ -105,11 +111,11 @@ begin
 
   v_rejected := false;
   begin
-    perform public.create_tier_board(v_payload, 'short');
+    perform public.create_tier_board(v_payload, '');
   exception when check_violation then
     v_rejected := true;
   end;
-  if not v_rejected then raise exception 'short edit key was accepted'; end if;
+  if not v_rejected then raise exception 'empty edit key was accepted'; end if;
 
   v_board := public.create_tier_board(v_payload, v_edit_key);
   v_board_id := (v_board->>'id')::uuid;

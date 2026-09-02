@@ -14,6 +14,7 @@
 - 드래그 없이도 모든 편집이 가능한 버튼·선택 메뉴
 - Cloudflare Turnstile을 통과하면 누구나 가입 화면 없이 생성
 - 생성할 때 직접 정한 표별 수정 키로 다른 기기에서도 수정·삭제
+- 수정 키는 한 글자 이상이면 숫자·한글·영문·기호 모두 허용
 - 같은 브라우저에서는 익명 소유권과 저장된 표별 키로 바로 수정
 - 320 px부터 데스크톱까지 대응하는 반응형 UI
 
@@ -63,7 +64,7 @@ PLAYWRIGHT_BASE_URL=https://tier.hajunshin.com npm run test:e2e
 
 ## Database
 
-여덟 개의 migration은 다음을 생성·보강합니다.
+아홉 개의 migration은 다음을 생성·보강합니다.
 
 - `tier_boards`
 - `tier_rows`
@@ -74,6 +75,7 @@ PLAYWRIGHT_BASE_URL=https://tier.hajunshin.com npm run test:e2e
 - 소유자별 25개 표 상한, 24개 gallery 조회 상한, payload 크기 검증
 - `updated_at` 선행 조건으로 다른 탭의 수정을 덮어쓰지 않는 충돌 감지
 - private 표별 bcrypt 키와 `verify_tier_board_key` / `key_save_tier_board` / `key_delete_tier_board` RPC
+- 1~100자의 자유 키와 legacy 영화 seed의 별도 수정 키
 - 운영 복구용 관리자 키 digest와 기존 관리자 RPC
 - 수정 가능한 영화 seed board
 

@@ -46,7 +46,7 @@ const BOARD_SELECT = `
 const BOARD_KEYS_STORAGE = 'tier.board-keys'
 const LEGACY_ADMIN_KEY_STORAGE = 'tier.admin-key'
 
-export const EDIT_KEY_LIMITS = { min: 8, max: 100 } as const
+export const EDIT_KEY_LIMITS = { min: 1, max: 100 } as const
 
 function getStoredBoardKeys(): Record<string, string> {
   try {

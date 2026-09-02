@@ -244,7 +244,7 @@ export function NewBoardPage() {
               />
             </label>
           </div>
-          <p className="field-help">다른 기기에서 수정·삭제할 때 필요합니다. 잊지 않게 보관하세요.</p>
+          <p className="field-help">한 글자 이상이면 숫자·한글·기호 모두 가능합니다. 잊지 않게 보관하세요.</p>
           {editKeyConfirmation && !keysMatch ? <p className="form-error" role="alert">수정 키가 일치하지 않습니다.</p> : null}
         </fieldset>
 

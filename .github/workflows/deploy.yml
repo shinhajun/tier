@@ -86,7 +86,7 @@ jobs:
           ready=false
           for attempt in $(seq 1 24); do
             html="$(curl --fail --silent --show-error --max-time 15 https://tier.hajunshin.com/ || true)"
-            if [[ "$html" == *'<meta name="tier-release" content="board-keys-v3"'* ]]; then
+            if [[ "$html" == *'<meta name="tier-release" content="flexible-keys-v4"'* ]]; then
               ready=true
               break
             fi

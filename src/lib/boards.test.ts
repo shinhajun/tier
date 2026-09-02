@@ -58,17 +58,17 @@ describe('board ownership boundary', () => {
       },
     })
 
-    await expect(createBoard(input, 'captcha-token', 'personal-edit-key')).resolves.toMatchObject({
+    await expect(createBoard(input, 'captcha-token', '1')).resolves.toMatchObject({
       id: 'board-id',
       slug: 'board-slug',
     })
     expect(ensureSessionMock).toHaveBeenCalledWith('captcha-token')
     expect(rpcMock).toHaveBeenCalledWith('create_tier_board', {
       p_board: expect.any(Object),
-      p_edit_key: 'personal-edit-key',
+      p_edit_key: '1',
     })
     expect(JSON.parse(localStorage.getItem('tier.board-keys') ?? '{}')).toEqual({
-      'board-id': 'personal-edit-key',
+      'board-id': '1',
     })
   })
 

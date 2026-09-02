@@ -112,4 +112,18 @@ describe('NewBoardPage', () => {
     expect(screen.getByText('수정 키가 일치하지 않습니다.')).toBeInTheDocument()
     expect(createBoardMock).not.toHaveBeenCalled()
   })
+
+  it('allows a one-character edit key', async () => {
+    const user = userEvent.setup()
+    createBoardMock.mockResolvedValue({ slug: 'short-key-board' } as TierBoard)
+    renderPage()
+
+    await user.type(screen.getByRole('textbox', { name: '제목' }), '짧은 키 표')
+    await user.type(screen.getByLabelText('수정 키'), '1')
+    await user.type(screen.getByLabelText('수정 키 확인'), '1')
+    await user.click(screen.getByRole('button', { name: '보안 확인 완료' }))
+    await user.click(screen.getByRole('button', { name: '티어표 만들기' }))
+
+    expect(createBoardMock).toHaveBeenCalledWith(expect.any(Object), 'test-captcha-token', '1')
+  })
 })

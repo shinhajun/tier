@@ -84,6 +84,7 @@
 - Tone: short, direct Korean, no marketing filler or slogans
 - Terminology: `티어표`, `행`, `항목`, `점수`, `편집`, `공유`
 - Microcopy rules: verbs first; avoid English unless it is user content; explain permissions only when an action requires it
+- Edit-key rule: accept any non-empty 1–100 character value, including Korean, numbers, and symbols; recommend storage without prescribing complexity
 
 ## Implementation constraints
 

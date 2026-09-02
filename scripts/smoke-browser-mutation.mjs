@@ -22,7 +22,7 @@ const page = await context.newPage()
 const suffix = Date.now().toString(36)
 const originalTitle = `배포 검증 ${suffix}`
 const editedTitle = `${originalTitle} 수정`
-const editKey = `edit-${suffix}-safe-key`
+const editKey = '1'
 let slug = ''
 
 async function waitUntilEnabled(locator, timeout = 30_000) {
