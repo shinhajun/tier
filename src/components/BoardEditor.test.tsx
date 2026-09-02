@@ -4,12 +4,14 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { TierBoard } from '../lib'
 import { BoardEditor } from './BoardEditor'
 
-const { saveBoardMock } = vi.hoisted(() => ({
+const { deleteBoardMock, saveBoardMock } = vi.hoisted(() => ({
+  deleteBoardMock: vi.fn(),
   saveBoardMock: vi.fn(),
 }))
 
 vi.mock('../lib', async (importOriginal) => ({
   ...await importOriginal<typeof import('../lib')>(),
+  deleteBoard: deleteBoardMock,
   saveBoard: saveBoardMock,
 }))
 
@@ -40,6 +42,7 @@ const board = (): TierBoard => ({
 
 describe('BoardEditor', () => {
   beforeEach(() => {
+    deleteBoardMock.mockReset()
     saveBoardMock.mockReset()
   })
 
@@ -131,5 +134,18 @@ describe('BoardEditor', () => {
 
     expect(screen.getByRole('alert')).toHaveTextContent('같은 이름의 행을 두 번 만들 수 없습니다.')
     expect(screen.getByRole('button', { name: '변경 내용 저장' })).toBeDisabled()
+  })
+
+  it('deletes the whole board from the editor after confirmation', async () => {
+    const user = userEvent.setup()
+    const onDeleted = vi.fn()
+    vi.spyOn(window, 'confirm').mockReturnValueOnce(true)
+    deleteBoardMock.mockResolvedValue(undefined)
+    render(<BoardEditor board={board()} onCancel={vi.fn()} onDeleted={onDeleted} onSaved={vi.fn()} />)
+
+    await user.click(screen.getByRole('button', { name: '티어표 삭제' }))
+
+    expect(deleteBoardMock).toHaveBeenCalledWith(expect.objectContaining({ id: 'board' }))
+    expect(onDeleted).toHaveBeenCalledOnce()
   })
 })

@@ -4,36 +4,37 @@
 
 - Status: Active
 - Last refreshed: 2026-09-02
-- Primary product surfaces: public gallery, board detail/editor, board creation
-- Evidence reviewed: owner request, existing `games` mobile patterns, current React/Vite scaffold, Cloudflare/Supabase constraints
+- Primary product surfaces: compact board list, board detail/editor, board creation, personal edit unlock
+- Evidence reviewed: owner request for a mostly personal and less decorative tool, current production UI, mobile tests, Cloudflare/Supabase constraints
 
 ## Brand
 
-- Personality: editorial, decisive, calm, slightly playful through color rather than decoration
-- Trust signals: clear ownership state, explicit save status, stable share URL, honest empty/error states
-- Avoid: purple-blue AI gradients, floating glass cards, emoji navigation, excessive shadows, tiny Korean copy, fake social proof
+- Personality: quiet, practical, compact; row colors provide the only strong visual accent
+- Trust signals: visible edit action, explicit save status, stable share URL, honest permission/error states
+- Avoid: marketing heroes, showcase samples, slogans, English eyebrow labels, oversized display type, decorative rotation, excessive shadows, tiny Korean copy
 
 ## Product goals
 
-- Goals: make a table in under a minute; make rankings readable at a glance; make mobile editing unsurprising
+- Goals: open a board with minimal navigation; edit any personal board safely; make rankings readable at a glance; keep mobile editing unsurprising
 - Non-goals: comments, follows, reactions, recommendation algorithms, poster scraping, real-time multi-user editing
 - Success signals: completed board creation, successful saves, copied share links, readable 320 px layout
 
 ## Personas and jobs
 
-- Primary personas: a casual curator ranking media; a viewer opening a shared link
-- User jobs: create categories, place entries, revise an opinion, share the result, scan someone else's hierarchy
-- Key contexts of use: one-handed phone editing, shared-link viewing, desktop batch entry
+- Primary personas: the owner maintaining personal rankings; an occasional viewer opening a shared link
+- User jobs: open a saved table, revise any entry or row, create another table, optionally share a link
+- Key contexts of use: frequent one-handed phone edits, desktop batch entry, occasional shared-link viewing
 
 ## Information architecture
 
-- Primary navigation: wordmark/home, `새 티어표` primary action
+- Primary navigation: compact wordmark/home, `새 티어표` action
 - Core routes/screens: `/`, `/new`, `/t/:slug`
-- Content hierarchy: board identity → rows and entries → edit/share actions → supporting metadata
+- Content hierarchy: board list or identity → rows and entries → edit/share actions; supporting metadata is secondary
 
 ## Design principles
 
 - The table is the interface: surrounding chrome stays quiet.
+- Personal utility beats product marketing: start with the saved boards, not an introduction.
 - Color carries row identity, not surface decoration.
 - Editing is explicit: view and edit modes do not blur together.
 - Mobile uses tap targets and move controls; drag-and-drop is never the only path.
@@ -42,17 +43,17 @@
 ## Visual language
 
 - Color: warm paper background, ink foreground, vermilion accent, distinct muted row colors
-- Typography: Korean-first system sans with tabular/monospace accents for scores and metadata
-- Spacing/layout rhythm: 4/8 px base; narrow reading width around 1120 px; full-bleed table on small screens
+- Typography: Korean-first system sans; modest hierarchy; monospace only for scores where useful
+- Spacing/layout rhythm: 4/8 px base; compact 960 px work area; full-bleed table only where it helps small screens
 - Shape/radius/elevation: 0–16 px radii, mostly 1 px borders, shadows only for modal/floating focus surfaces
 - Motion: short 120–180 ms feedback; none for layout-critical changes; respect reduced motion
 - Imagery/iconography: text-first; simple line icons only where a label would be redundant
 
 ## Components
 
-- Existing components to reuse: none; new repository
-- New/changed components: AppShell, BoardCard, TierTable, TierRow, ItemTile, BoardForm, EditToolbar, EmptyState
-- Variants and states: owner/read-only, saved/saving/error, empty/populated, selected/unselected entry
+- Existing components to reuse: AppShell, BoardCard, TierTable, BoardEditor, TurnstileGate
+- New/changed components: compact home/shell, edit-key prompt, editor delete action
+- Variants and states: owner/admin/locked, saved/saving/error, empty/populated, selected/unselected entry
 - Token/component ownership: CSS custom properties in `src/index.css`; component-specific layout in `src/App.css`
 
 ## Accessibility
@@ -80,19 +81,18 @@
 
 ## Content voice
 
-- Tone: direct, plain Korean, no marketing filler
+- Tone: short, direct Korean, no marketing filler or slogans
 - Terminology: `티어표`, `행`, `항목`, `점수`, `편집`, `공유`
-- Microcopy rules: verbs first; avoid English unless it is the chosen row label; explain anonymous ownership once
+- Microcopy rules: verbs first; avoid English unless it is user content; explain permissions only when an action requires it
 
 ## Implementation constraints
 
 - Framework/styling system: React + TypeScript + Vite; plain CSS; Supabase JS
 - Design-token constraints: one CSS variable layer, no component-library theme wrapper
 - Performance constraints: no image API; route chunks kept small; no background polling
-- Compatibility constraints: Cloudflare Pages SPA fallback; browser storage required for anonymous session continuity
+- Compatibility constraints: Cloudflare Pages SPA fallback; browser storage retains anonymous ownership and a successfully verified personal admin key
 - Test/screenshot expectations: component flows plus desktop/mobile production screenshots and overflow checks
 
 ## Open questions
 
-- [ ] Optional account upgrade for cross-device editing / future scope / medium impact
-- [ ] Poster or cover image integrations / future scope / low impact
+- [ ] Optional account-based key recovery / future scope / low impact

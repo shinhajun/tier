@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { canEditBoard, createBoard, deleteBoard, saveBoard } from './boards'
+import { canEditBoard, createBoard, deleteBoard, saveBoard, unlockAdminEditing } from './boards'
 import type { BoardDraft, TierBoard } from './types'
 
 const { ensureSessionMock, getSessionMock, rpcMock } = vi.hoisted(() => ({
@@ -18,6 +18,7 @@ vi.mock('./supabase', () => ({
 
 describe('board ownership boundary', () => {
   beforeEach(() => {
+    localStorage.clear()
     ensureSessionMock.mockReset()
     getSessionMock.mockReset()
     rpcMock.mockReset()
@@ -31,7 +32,7 @@ describe('board ownership boundary', () => {
   })
 
   it('deletes through the owner-only RPC after direct writes are revoked', async () => {
-    ensureSessionMock.mockResolvedValue({ id: 'owner' })
+    getSessionMock.mockResolvedValue({ data: { session: { user: { id: 'owner' } } }, error: null })
     rpcMock.mockResolvedValue({ data: 'board-id', error: null })
 
     await expect(deleteBoard({ id: 'board-id', ownerId: 'owner' })).resolves.toBeUndefined()
@@ -72,7 +73,7 @@ describe('board ownership boundary', () => {
       createdAt: '2026-09-02T00:00:00.000Z', updatedAt: '2026-09-02T00:00:00.000Z',
       rows: [{ id: 'row', label: 'A', color: '#183153', position: 0, items: [] }],
     }
-    ensureSessionMock.mockResolvedValue({ id: 'owner' })
+    getSessionMock.mockResolvedValue({ data: { session: { user: { id: 'owner' } } }, error: null })
     rpcMock.mockResolvedValue({
       error: null,
       data: {
@@ -86,5 +87,45 @@ describe('board ownership boundary', () => {
     expect(rpcMock).toHaveBeenCalledWith('save_tier_board', expect.objectContaining({
       p_expected_updated_at: board.updatedAt,
     }))
+  })
+
+  it('stores a verified admin key and uses the admin save RPC for the seed board', async () => {
+    rpcMock.mockResolvedValueOnce({ data: true, error: null })
+
+    await expect(unlockAdminEditing('  personal-admin-key  ')).resolves.toBeUndefined()
+    expect(rpcMock).toHaveBeenCalledWith('verify_tier_admin', {
+      p_admin_key: 'personal-admin-key',
+    })
+
+    const seed: TierBoard = {
+      id: 'seed', slug: 'space-movie-scores', title: '영화', category: '영화',
+      description: null, ownerId: null, isPublic: true,
+      createdAt: '2026-09-02T00:00:00.000Z', updatedAt: '2026-09-02T00:00:00.000Z',
+      rows: [{ id: 'row', label: '9점', color: '#E26645', position: 0, items: [] }],
+    }
+    rpcMock.mockResolvedValueOnce({
+      error: null,
+      data: {
+        id: seed.id, slug: seed.slug, title: seed.title, category: seed.category,
+        description: null, owner_id: null, is_public: true,
+        created_at: seed.createdAt, updated_at: '2026-09-02T00:01:00.000Z', tier_rows: [],
+      },
+    })
+
+    await saveBoard(seed)
+    expect(rpcMock).toHaveBeenLastCalledWith('admin_save_tier_board', expect.objectContaining({
+      p_board_id: seed.id,
+      p_admin_key: 'personal-admin-key',
+      p_expected_updated_at: seed.updatedAt,
+    }))
+    expect(ensureSessionMock).not.toHaveBeenCalled()
+  })
+
+  it('does not retain an invalid admin key', async () => {
+    rpcMock.mockResolvedValue({ data: false, error: null })
+
+    await expect(unlockAdminEditing('wrong-key')).rejects.toThrow('관리자 키가 올바르지 않습니다.')
+    await expect(canEditBoard({ ownerId: null })).resolves.toBe(false)
+    expect(rpcMock).toHaveBeenCalledTimes(1)
   })
 })

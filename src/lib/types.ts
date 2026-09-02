@@ -52,7 +52,4 @@ export type BoardSummary = Pick<
   'id' | 'slug' | 'title' | 'category' | 'description' | 'updatedAt'
 > & {
   itemCount: number
-  rows: Array<Pick<TierRow, 'id' | 'label' | 'color' | 'position'> & {
-    items: string[]
-  }>
 }

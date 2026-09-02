@@ -30,9 +30,15 @@ async function expectSubmitBarDoesNotCoverRows(page: import('@playwright/test').
 
 test('public movie board is readable from the gallery', async ({ page }, testInfo) => {
   await page.goto('/')
-  await expect(page.getByRole('heading', { name: '좋아하는 것들을, 내 기준대로.' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: '티어표' })).toBeVisible()
+  await expect(page.getByLabel('티어표 예시')).toHaveCount(0)
   await expect(page.getByRole('link', { name: /우주와 미래를 그린 영화/ })).toBeVisible()
   await expectNoHorizontalOverflow(page)
+
+  await page.screenshot({
+    path: `test-results/${testInfo.project.name}-home.png`,
+    fullPage: true,
+  })
 
   await page.getByRole('link', { name: /우주와 미래를 그린 영화/ }).click()
   await expect(page.getByRole('heading', { name: '우주와 미래를 그린 영화' })).toBeVisible()
@@ -49,7 +55,7 @@ test('public movie board is readable from the gallery', async ({ page }, testInf
 
   await page.evaluate(() => {
     const longText = '아'.repeat(300)
-    const description = document.querySelector<HTMLElement>('.board-header__copy > p:not(.eyebrow)')
+    const description = document.querySelector<HTMLElement>('.board-header__copy > p:not(.board-meta)')
     const title = document.querySelector<HTMLElement>('.tier-item strong')
     const note = document.querySelector<HTMLElement>('.tier-item > span')
     if (description) description.textContent = longText

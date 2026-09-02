@@ -8,6 +8,7 @@ import {
 import {
   BOARD_LIMITS,
   BoardValidationError,
+  deleteBoard,
   isValidTierScore,
   saveBoard,
   validateBoardDraft,
@@ -28,16 +29,17 @@ function reorder<T>(list: T[], from: number, to: number) {
 interface BoardEditorProps {
   board: TierBoard
   onCancel: () => void
+  onDeleted?: () => void
   onSaved: (board: TierBoard) => void
 }
 
-export function BoardEditor({ board, onCancel, onSaved }: BoardEditorProps) {
+export function BoardEditor({ board, onCancel, onDeleted, onSaved }: BoardEditorProps) {
   const [draft, setDraft] = useState<TierBoard>(() => structuredClone(board))
   const [newTitle, setNewTitle] = useState('')
   const [newScore, setNewScore] = useState('')
   const [newRowId, setNewRowId] = useState(board.rows[0]?.id ?? '')
   const [quickAddError, setQuickAddError] = useState('')
-  const [status, setStatus] = useState<'idle' | 'saving' | 'error'>('idle')
+  const [status, setStatus] = useState<'idle' | 'saving' | 'deleting' | 'error'>('idle')
   const [error, setError] = useState('')
 
   const itemCount = draft.rows.reduce((total, row) => total + row.items.length, 0)
@@ -165,13 +167,24 @@ export function BoardEditor({ board, onCancel, onSaved }: BoardEditorProps) {
     }
   }
 
+  async function removeBoard() {
+    if (status === 'saving' || status === 'deleting') return
+    if (!window.confirm(`‘${draft.title}’ 티어표를 삭제할까요?`)) return
+    setStatus('deleting')
+    setError('')
+    try {
+      await deleteBoard(draft)
+      onDeleted?.()
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : '티어표를 삭제하지 못했습니다.')
+      setStatus('error')
+    }
+  }
+
   return (
     <form className="board-editor" onSubmit={submit}>
       <div className="editor-intro">
-        <div>
-          <p className="eyebrow">EDIT MODE</p>
-          <h2>티어표 편집</h2>
-        </div>
+        <h2>티어표 수정</h2>
         <span>{itemCount}개 항목 · {draft.rows.length}개 행</span>
       </div>
 
@@ -315,11 +328,16 @@ export function BoardEditor({ board, onCancel, onSaved }: BoardEditorProps) {
 
       {validationMessage ? <p className="form-error" role="alert">{validationMessage}</p> : null}
       {status === 'error' ? <p className="form-error" role="alert">{error}</p> : null}
-      <div className="sticky-actions">
-        <button className="button button--ghost" type="button" onClick={onCancel}>취소</button>
-        <button className="button button--accent" type="submit" disabled={!isValid || status === 'saving'}>
-          {status === 'saving' ? '저장하는 중…' : '변경 내용 저장'}
+      <div className="editor-actions">
+        <button className="button button--danger" type="button" onClick={() => void removeBoard()} disabled={status === 'saving' || status === 'deleting'}>
+          {status === 'deleting' ? '삭제 중…' : '티어표 삭제'}
         </button>
+        <div>
+          <button className="button button--ghost" type="button" onClick={onCancel}>취소</button>
+          <button className="button button--ink" type="submit" disabled={!isValid || status === 'saving' || status === 'deleting'}>
+            {status === 'saving' ? '저장하는 중…' : '변경 내용 저장'}
+          </button>
+        </div>
       </div>
     </form>
   )

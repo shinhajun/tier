@@ -5,6 +5,7 @@ export {
   getBoardBySlug,
   listPublicBoards,
   saveBoard,
+  unlockAdminEditing,
 } from './boards'
 export { getReadableTextColor } from './color'
 export {

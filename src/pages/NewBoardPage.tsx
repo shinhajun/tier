@@ -113,16 +113,14 @@ export function NewBoardPage() {
 
   return (
     <section className="creator page-width page-width--narrow">
-      <Link className="back-link" to="/"><ArrowLeftIcon /> 둘러보기</Link>
+      <Link className="back-link" to="/"><ArrowLeftIcon /> 티어표</Link>
       <header className="creator__header">
-        <p className="eyebrow">NEW TABLE</p>
         <h1>새 티어표</h1>
-        <p>먼저 기준이 될 행을 정하세요. 항목은 표를 만든 다음 차분히 채울 수 있습니다.</p>
       </header>
 
       <form className="creator-form" onSubmit={submit}>
         <fieldset className="form-section">
-          <legend><span>01</span> 표의 이름</legend>
+          <legend>기본 정보</legend>
           <div className="form-grid form-grid--title">
             <label className="field">
               <span>제목</span>
@@ -159,7 +157,7 @@ export function NewBoardPage() {
         </fieldset>
 
         <fieldset className="form-section">
-          <legend><span>02</span> 행 구성</legend>
+          <legend>행 구성</legend>
           <div className="template-list">
             {templates.map((template) => (
               <button
@@ -210,16 +208,8 @@ export function NewBoardPage() {
           </button>
         </fieldset>
 
-        <div className="ownership-note">
-          <strong>로그인 없이 바로 시작합니다.</strong>
-          <p>이 브라우저에 익명 편집 권한이 저장됩니다. 브라우저 데이터를 지우면 편집할 수 없으니, 완성한 표의 주소를 따로 보관해 주세요.</p>
-        </div>
-
         <div className="captcha-section">
-          <div>
-            <strong>보안 확인</strong>
-            <p>자동 생성을 막기 위한 한 번의 확인입니다.</p>
-          </div>
+          <strong>보안 확인</strong>
           <TurnstileGate key={captchaResetKey} onToken={handleCaptchaToken} />
         </div>
 

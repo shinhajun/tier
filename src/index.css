@@ -1,18 +1,16 @@
 :root {
-  --paper: #f2efe6;
-  --paper-strong: #e8e3d7;
-  --ink: #171816;
-  --ink-soft: #4e504a;
-  --line: #cfc9bc;
-  --line-dark: #a9a396;
-  --accent: #e75534;
-  --accent-dark: #b83c23;
+  --paper: #f7f6f2;
+  --paper-strong: #eceae4;
+  --ink: #1d1e1b;
+  --ink-soft: #575951;
+  --line: #d5d2ca;
+  --line-dark: #aaa79e;
+  --accent: #bd533c;
+  --accent-dark: #963b28;
   --white: #fffdf7;
   --success: #2f755f;
   --danger: #aa3328;
   --sans: Pretendard, -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Noto Sans KR', 'Segoe UI', sans-serif;
-  --display: 'Iowan Old Style', 'Noto Serif KR', 'AppleMyungjo', 'Nanum Myeongjo', serif;
-  --mono: 'SFMono-Regular', Consolas, 'Liberation Mono', monospace;
   color: var(--ink);
   background: var(--paper);
   font-family: var(--sans);

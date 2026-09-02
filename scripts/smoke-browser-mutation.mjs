@@ -3,8 +3,9 @@ import { chromium } from '@playwright/test'
 const baseUrl = process.env.PLAYWRIGHT_BASE_URL
 const supabaseUrl = process.env.VITE_SUPABASE_URL
 const publishableKey = process.env.VITE_SUPABASE_PUBLISHABLE_KEY
+const adminKey = process.env.TIER_ADMIN_KEY
 
-if (!baseUrl || !supabaseUrl || !publishableKey) {
+if (!baseUrl || !supabaseUrl || !publishableKey || !adminKey) {
   throw new Error('Production browser smoke environment is incomplete.')
 }
 
@@ -47,7 +48,16 @@ try {
   if (!slug) throw new Error('Created board URL did not include a slug.')
   await page.getByRole('heading', { name: originalTitle }).waitFor({ state: 'visible' })
 
-  await page.getByRole('button', { name: '편집' }).click()
+  await page.evaluate(() => {
+    for (const key of Object.keys(localStorage)) {
+      if (key.endsWith('-auth-token')) localStorage.removeItem(key)
+    }
+  })
+  await page.reload()
+  await page.getByRole('button', { name: '수정' }).click()
+  await page.getByLabel('관리자 키').fill(adminKey)
+  await page.getByRole('button', { name: '잠금 해제' }).click()
+  await page.getByRole('heading', { name: '티어표 수정' }).waitFor({ state: 'visible' })
   await page.getByRole('textbox', { name: '제목' }).fill(editedTitle)
   await page.getByPlaceholder('작품, 곡, 대상 이름').fill('연결 검증 항목')
   await page.getByRole('button', { name: '추가', exact: true }).click()
@@ -60,15 +70,23 @@ try {
   await page.getByRole('button', { name: '변경 내용 저장' }).click()
   await page.getByRole('heading', { name: editedTitle }).waitFor({ state: 'visible' })
   await page.getByText('연결 검증 항목').waitFor({ state: 'visible' })
+
+  await page.getByRole('button', { name: '수정' }).click()
+  page.once('dialog', (dialog) => dialog.accept())
+  await page.getByRole('button', { name: '티어표 삭제' }).click()
+  await page.waitForURL((url) => url.pathname === '/')
+
+  const verifyResponse = await fetch(
+    `${supabaseUrl}/rest/v1/tier_boards?slug=eq.${encodeURIComponent(slug)}&select=id`,
+    { headers: { apikey: publishableKey, Authorization: `Bearer ${publishableKey}` } },
+  )
+  if (!verifyResponse.ok) throw new Error(`Delete verification failed: ${verifyResponse.status}`)
+  if ((await verifyResponse.json()).length !== 0) throw new Error('Admin-deleted board still exists.')
+  slug = ''
 } finally {
   try {
-    if (slug) await page.evaluate(async ({ key, slugToDelete, url }) => {
-      const storageKey = Object.keys(localStorage).find((candidate) => candidate.endsWith('-auth-token'))
-      const rawSession = storageKey ? localStorage.getItem(storageKey) : null
-      const accessToken = rawSession ? JSON.parse(rawSession).access_token : null
-      if (!accessToken) throw new Error('Cleanup could not read the owner session.')
-
-      const headers = { apikey: key, Authorization: `Bearer ${accessToken}` }
+    if (slug) await page.evaluate(async ({ admin, key, slugToDelete, url }) => {
+      const headers = { apikey: key, Authorization: `Bearer ${key}` }
       const boardResponse = await fetch(
         `${url}/rest/v1/tier_boards?slug=eq.${encodeURIComponent(slugToDelete)}&select=id`,
         { headers },
@@ -77,10 +95,10 @@ try {
       const boards = await boardResponse.json()
       if (!boards[0]?.id) throw new Error('Cleanup could not find the created board.')
 
-      const deleteResponse = await fetch(`${url}/rest/v1/rpc/delete_tier_board`, {
+      const deleteResponse = await fetch(`${url}/rest/v1/rpc/admin_delete_tier_board`, {
         method: 'POST',
         headers: { ...headers, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ p_board_id: boards[0].id }),
+        body: JSON.stringify({ p_board_id: boards[0].id, p_admin_key: admin }),
       })
       if (!deleteResponse.ok) throw new Error(`Cleanup delete failed: ${deleteResponse.status}`)
 
@@ -90,10 +108,10 @@ try {
       )
       if (!verifyResponse.ok) throw new Error(`Cleanup verification failed: ${verifyResponse.status}`)
       if ((await verifyResponse.json()).length !== 0) throw new Error('Cleanup board still exists.')
-    }, { key: publishableKey, slugToDelete: slug, url: supabaseUrl })
+    }, { admin: adminKey, key: publishableKey, slugToDelete: slug, url: supabaseUrl })
   } finally {
     await browser.close()
   }
 }
 
-console.log(JSON.stringify({ captchaAuth: true, create: true, edit: true, cleanup: true }))
+console.log(JSON.stringify({ captchaAuth: true, create: true, adminEdit: true, adminDelete: true, cleanup: true }))

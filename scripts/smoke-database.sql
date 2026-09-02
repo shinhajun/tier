@@ -13,6 +13,7 @@ declare
   v_after integer;
   v_expected timestamptz;
   v_rejected boolean;
+  v_admin_key text := 'ci-admin-key-0123456789abcdef0123456789';
   v_payload jsonb := '{
     "title": "CI boundary smoke",
     "category": "검증",
@@ -44,6 +45,19 @@ begin
     or pg_catalog.has_table_privilege('authenticated', 'public.tier_boards', 'UPDATE')
     or pg_catalog.has_table_privilege('authenticated', 'public.tier_boards', 'DELETE') then
     raise exception 'authenticated direct board writes must stay revoked';
+  end if;
+
+  insert into private.tier_admin_credentials (singleton, key_hash)
+  values (true, extensions.digest(v_admin_key, 'sha256'))
+  on conflict (singleton) do update
+  set key_hash = excluded.key_hash,
+      updated_at = pg_catalog.now();
+
+  if not public.verify_tier_admin(v_admin_key) then
+    raise exception 'valid admin key was rejected';
+  end if;
+  if public.verify_tier_admin('invalid-admin-key') then
+    raise exception 'invalid admin key was accepted';
   end if;
 
   perform pg_catalog.set_config('request.jwt.claim.sub', v_owner::text, true);
@@ -119,6 +133,29 @@ begin
 
   v_rejected := false;
   begin
+    perform public.admin_save_tier_board(
+      v_board_id,
+      v_payload,
+      (v_saved->>'updated_at')::timestamptz,
+      'invalid-admin-key'
+    );
+  exception when insufficient_privilege then
+    v_rejected := true;
+  end;
+  if not v_rejected then raise exception 'invalid admin save was accepted'; end if;
+
+  v_saved := public.admin_save_tier_board(
+    v_board_id,
+    pg_catalog.jsonb_set(v_payload, '{title}', '"admin write passed"'::jsonb),
+    (v_saved->>'updated_at')::timestamptz,
+    v_admin_key
+  );
+  if v_saved->>'title' <> 'admin write passed' then
+    raise exception 'admin save did not return the saved board';
+  end if;
+
+  v_rejected := false;
+  begin
     perform public.save_tier_board(
       '10000000-0000-4000-8000-000000000001'::uuid,
       v_payload,
@@ -131,6 +168,12 @@ begin
 
   if public.delete_tier_board(v_board_id) <> v_board_id then
     raise exception 'delete RPC returned an unexpected ID';
+  end if;
+
+  v_board := public.create_tier_board(v_payload);
+  v_board_id := (v_board->>'id')::uuid;
+  if public.admin_delete_tier_board(v_board_id, v_admin_key) <> v_board_id then
+    raise exception 'admin delete RPC returned an unexpected ID';
   end if;
 
   raise notice 'database boundary smoke passed';
