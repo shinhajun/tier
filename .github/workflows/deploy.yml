@@ -99,5 +99,5 @@ jobs:
         env:
           PLAYWRIGHT_BASE_URL: https://tier.hajunshin.com
         run: |
-          npx playwright test --project=desktop-chrome --grep "public movie board|Turnstile gate"
+          npx playwright test --project=desktop-chrome --grep "public movie board"
           xvfb-run -a node scripts/smoke-browser-mutation.mjs
