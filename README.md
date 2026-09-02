@@ -52,7 +52,7 @@ npm audit --omit=dev
 ./scripts/verify-no-secrets.sh
 ```
 
-`npm run test:e2e`는 desktop Chrome, 390×844 mobile Chrome, 320×568 Chrome, mobile WebKit에서 공개 영화 표, 직접 URL, 44px 터치 대상, 긴 입력값 오버플로와 행 편집 컨트롤을 검사합니다. `scripts/smoke-database.sql`은 운영 DB 트랜잭션을 롤백하며 소유자 쓰기·비소유자 거부·직접 쓰기 차단·잘못된 payload rollback·충돌 거부·시드 불변성·삭제를 검증합니다. `npm run verify:captcha`는 Turnstile token이 없는 익명 가입을 운영 Auth가 실제로 거부하는지 검사합니다. `smoke-browser-mutation.mjs`는 실제 Turnstile token으로 익명 생성→항목 추가·편집→삭제·미존재 확인까지 실행합니다. `npm run smoke:db`는 CAPTCHA를 켜기 전의 실제 익명 Auth 통합 호출에 사용합니다. 배포된 사이트를 검사하려면:
+`npm run test:e2e`는 desktop Chrome, 390×844 mobile Chrome, 320×568 Chrome, mobile WebKit에서 공개 영화 표, 직접 URL, 44px 터치 대상, 긴 입력값 오버플로와 행 편집 컨트롤을 검사합니다. `scripts/smoke-database.sql`은 운영 DB 트랜잭션을 롤백하며 소유자 쓰기·비소유자 거부·직접 쓰기 차단·잘못된 payload rollback·충돌 거부·시드 불변성·삭제를 검증합니다. `npm run verify:captcha`는 Turnstile token이 없는 익명 가입을 운영 Auth가 실제로 거부하는지 검사합니다. `smoke-browser-mutation.mjs`는 실제 Turnstile token으로 익명 생성→항목 추가·편집→삭제·미존재 확인까지 실행합니다. Cloudflare는 호스팅 사업자 IP의 자동 위젯 해결을 차단할 수 있으므로 이 양성 경로는 GitHub 호스티드 러너가 아니라 신뢰 가능한 운영자 환경에서 릴리스 수용 검사로 실행합니다. `npm run smoke:db`는 CAPTCHA를 켜기 전의 실제 익명 Auth 통합 호출에 사용합니다. 배포된 사이트를 검사하려면:
 
 ```bash
 PLAYWRIGHT_BASE_URL=https://tier.hajunshin.com npm run test:e2e
@@ -83,8 +83,9 @@ PLAYWRIGHT_BASE_URL=https://tier.hajunshin.com npm run test:e2e
 3. dependency audit와 tracked/untracked candidate secret scan
 4. Cloudflare Pages `tier` 프로젝트 배포
 5. 롤백 트랜잭션으로 운영 DB의 소유권·검증·충돌 경계 검사
-6. `tier.hajunshin.com`의 HTML, SPA deep link, 보안 헤더, 브라우저 seed 로드와 Turnstile 위젯 렌더 검사
-7. 실제 Turnstile→Supabase 익명 Auth→create·edit·delete RPC 성공 경로와 정리 확인
+6. `tier.hajunshin.com`의 HTML, SPA deep link, 보안 헤더와 공개 브라우저 seed 로드 검사
+
+실제 Turnstile→Supabase 익명 Auth→create·edit·delete RPC 성공 경로와 정리 확인은 위의 `smoke-browser-mutation.mjs` 명령으로 신뢰 가능한 운영자 환경에서 별도 수행합니다. CI는 token 없는 가입 거부, 데이터베이스 권한 경계, 공개 운영 화면을 계속 자동 검증합니다.
 
 GitHub encrypted secrets:
 
