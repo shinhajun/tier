@@ -43,14 +43,47 @@ const BOARD_SELECT = `
   tier_rows (id, label, color, position, tier_items (id, title, note, score, position))
 `
 
-const ADMIN_KEY_STORAGE = 'tier.admin-key'
+const BOARD_KEYS_STORAGE = 'tier.board-keys'
+const LEGACY_ADMIN_KEY_STORAGE = 'tier.admin-key'
 
-function getStoredAdminKey() {
-  return window.localStorage.getItem(ADMIN_KEY_STORAGE)?.trim() || null
+export const EDIT_KEY_LIMITS = { min: 8, max: 100 } as const
+
+function getStoredBoardKeys(): Record<string, string> {
+  try {
+    const stored = JSON.parse(window.localStorage.getItem(BOARD_KEYS_STORAGE) ?? '{}')
+    if (!stored || typeof stored !== 'object' || Array.isArray(stored)) return {}
+    return Object.fromEntries(
+      Object.entries(stored).filter((entry): entry is [string, string] => typeof entry[1] === 'string'),
+    )
+  } catch {
+    return {}
+  }
 }
 
-function forgetAdminKey() {
-  window.localStorage.removeItem(ADMIN_KEY_STORAGE)
+function storeBoardKey(boardId: string, editKey: string) {
+  window.localStorage.setItem(BOARD_KEYS_STORAGE, JSON.stringify({
+    ...getStoredBoardKeys(),
+    [boardId]: editKey,
+  }))
+}
+
+function getStoredBoardKey(boardId: string) {
+  return getStoredBoardKeys()[boardId]?.trim()
+    || window.localStorage.getItem(LEGACY_ADMIN_KEY_STORAGE)?.trim()
+    || null
+}
+
+function forgetBoardKey(boardId: string, rejectedKey?: string) {
+  const keys = getStoredBoardKeys()
+  delete keys[boardId]
+  if (Object.keys(keys).length) {
+    window.localStorage.setItem(BOARD_KEYS_STORAGE, JSON.stringify(keys))
+  } else {
+    window.localStorage.removeItem(BOARD_KEYS_STORAGE)
+  }
+  if (rejectedKey && window.localStorage.getItem(LEGACY_ADMIN_KEY_STORAGE)?.trim() === rejectedKey) {
+    window.localStorage.removeItem(LEGACY_ADMIN_KEY_STORAGE)
+  }
 }
 
 async function isCurrentOwner(board: Pick<TierBoard, 'ownerId'>) {
@@ -60,9 +93,10 @@ async function isCurrentOwner(board: Pick<TierBoard, 'ownerId'>) {
   return data.session?.user.id === board.ownerId
 }
 
-async function verifyAdminKey(adminKey: string) {
-  const { data, error } = await getSupabaseClient().rpc('verify_tier_admin', {
-    p_admin_key: adminKey,
+async function verifyBoardKey(boardId: string, editKey: string) {
+  const { data, error } = await getSupabaseClient().rpc('verify_tier_board_key', {
+    p_board_id: boardId,
+    p_edit_key: editKey,
   })
   if (error) throw error
   return data === true
@@ -187,66 +221,81 @@ export async function getBoardBySlug(slug: string): Promise<TierBoard | null> {
 export async function createBoard(
   input: CreateBoardInput,
   captchaToken: string,
+  editKey: string,
 ): Promise<TierBoard> {
+  const normalizedKey = editKey.trim()
+  if (normalizedKey.length < EDIT_KEY_LIMITS.min || normalizedKey.length > EDIT_KEY_LIMITS.max) {
+    throw new Error(`수정 키는 ${EDIT_KEY_LIMITS.min}~${EDIT_KEY_LIMITS.max}자로 정해 주세요.`)
+  }
   await ensureSession(captchaToken)
   const { data, error } = await getSupabaseClient().rpc('create_tier_board', {
     p_board: rpcPayload(input),
+    p_edit_key: normalizedKey,
   })
   if (error) throwRpcError(error)
-  return mapRpcBoard(data)
+  const board = mapRpcBoard(data)
+  storeBoardKey(board.id, normalizedKey)
+  return board
 }
 
 export async function saveBoard(board: TierBoard): Promise<TierBoard> {
   validateBoardDraft(board)
-  const adminKey = getStoredAdminKey()
+  const editKey = getStoredBoardKey(board.id)
   const owner = await isCurrentOwner(board)
-  if (!owner && !adminKey) throw new Error('관리자 키로 편집 잠금을 먼저 해제해 주세요.')
+  if (!owner && !editKey) throw new Error('수정 키로 편집 잠금을 먼저 해제해 주세요.')
 
-  const rpc = owner ? 'save_tier_board' : 'admin_save_tier_board'
+  const rpc = owner ? 'save_tier_board' : 'key_save_tier_board'
   const input = {
     p_board_id: board.id,
     p_board: rpcPayload(board),
     p_expected_updated_at: board.updatedAt,
-    ...(!owner && adminKey ? { p_admin_key: adminKey } : {}),
+    ...(!owner && editKey ? { p_edit_key: editKey } : {}),
   }
   const { data, error } = await getSupabaseClient().rpc(rpc, input)
-  if (!owner && error?.code === '42501') forgetAdminKey()
+  if (!owner && error?.code === '42501') {
+    forgetBoardKey(board.id, editKey ?? undefined)
+    throw new Error('수정 키가 올바르지 않습니다.')
+  }
   if (error) throwRpcError(error)
   return mapRpcBoard(data)
 }
 
 export async function deleteBoard(board: Pick<TierBoard, 'id' | 'ownerId'>) {
-  const adminKey = getStoredAdminKey()
+  const editKey = getStoredBoardKey(board.id)
   const owner = await isCurrentOwner(board)
-  if (!owner && !adminKey) throw new Error('관리자 키로 편집 잠금을 먼저 해제해 주세요.')
+  if (!owner && !editKey) throw new Error('수정 키로 편집 잠금을 먼저 해제해 주세요.')
 
-  const rpc = owner ? 'delete_tier_board' : 'admin_delete_tier_board'
+  const rpc = owner ? 'delete_tier_board' : 'key_delete_tier_board'
   const { data, error } = await getSupabaseClient().rpc(rpc, {
     p_board_id: board.id,
-    ...(!owner && adminKey ? { p_admin_key: adminKey } : {}),
+    ...(!owner && editKey ? { p_edit_key: editKey } : {}),
   })
-  if (!owner && error?.code === '42501') forgetAdminKey()
+  if (!owner && error?.code === '42501') {
+    forgetBoardKey(board.id, editKey ?? undefined)
+    throw new Error('수정 키가 올바르지 않습니다.')
+  }
   if (error) throwRpcError(error)
   if (data !== board.id) throw new Error('삭제된 티어표 ID가 일치하지 않습니다.')
+  forgetBoardKey(board.id)
 }
 
-export async function unlockAdminEditing(input: string) {
-  const adminKey = input.trim()
-  if (!adminKey) throw new Error('관리자 키를 입력해 주세요.')
-  if (!await verifyAdminKey(adminKey)) {
-    forgetAdminKey()
-    throw new Error('관리자 키가 올바르지 않습니다.')
+export async function unlockBoardEditing(boardId: string, input: string) {
+  const editKey = input.trim()
+  if (!editKey) throw new Error('수정 키를 입력해 주세요.')
+  if (!await verifyBoardKey(boardId, editKey)) {
+    forgetBoardKey(boardId, editKey)
+    throw new Error('수정 키가 올바르지 않습니다.')
   }
-  window.localStorage.setItem(ADMIN_KEY_STORAGE, adminKey)
+  storeBoardKey(boardId, editKey)
 }
 
 export async function canEditBoard(
-  board: Pick<TierBoard, 'ownerId'>,
+  board: Pick<TierBoard, 'id' | 'ownerId'>,
 ): Promise<boolean> {
   if (await isCurrentOwner(board)) return true
-  const adminKey = getStoredAdminKey()
-  if (!adminKey) return false
-  if (await verifyAdminKey(adminKey)) return true
-  forgetAdminKey()
+  const editKey = getStoredBoardKey(board.id)
+  if (!editKey) return false
+  if (await verifyBoardKey(board.id, editKey)) return true
+  forgetBoardKey(board.id, editKey)
   return false
 }

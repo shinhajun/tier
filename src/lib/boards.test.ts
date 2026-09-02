@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { canEditBoard, createBoard, deleteBoard, saveBoard, unlockAdminEditing } from './boards'
+import { canEditBoard, createBoard, deleteBoard, saveBoard, unlockBoardEditing } from './boards'
 import type { BoardDraft, TierBoard } from './types'
 
 const { ensureSessionMock, getSessionMock, rpcMock } = vi.hoisted(() => ({
@@ -28,7 +28,7 @@ describe('board ownership boundary', () => {
     const failure = new Error('세션 조회 실패')
     getSessionMock.mockResolvedValue({ data: { session: null }, error: failure })
 
-    await expect(canEditBoard({ ownerId: 'owner' })).rejects.toBe(failure)
+    await expect(canEditBoard({ id: 'board-id', ownerId: 'owner' })).rejects.toBe(failure)
   })
 
   it('deletes through the owner-only RPC after direct writes are revoked', async () => {
@@ -58,12 +58,18 @@ describe('board ownership boundary', () => {
       },
     })
 
-    await expect(createBoard(input, 'captcha-token')).resolves.toMatchObject({
+    await expect(createBoard(input, 'captcha-token', 'personal-edit-key')).resolves.toMatchObject({
       id: 'board-id',
       slug: 'board-slug',
     })
     expect(ensureSessionMock).toHaveBeenCalledWith('captcha-token')
-    expect(rpcMock).toHaveBeenCalledOnce()
+    expect(rpcMock).toHaveBeenCalledWith('create_tier_board', {
+      p_board: expect.any(Object),
+      p_edit_key: 'personal-edit-key',
+    })
+    expect(JSON.parse(localStorage.getItem('tier.board-keys') ?? '{}')).toEqual({
+      'board-id': 'personal-edit-key',
+    })
   })
 
   it('sends the last update timestamp as the stale-write precondition', async () => {
@@ -89,12 +95,13 @@ describe('board ownership boundary', () => {
     }))
   })
 
-  it('stores a verified admin key and uses the admin save RPC for the seed board', async () => {
+  it('stores a verified board key and uses the key save RPC for that board', async () => {
     rpcMock.mockResolvedValueOnce({ data: true, error: null })
 
-    await expect(unlockAdminEditing('  personal-admin-key  ')).resolves.toBeUndefined()
-    expect(rpcMock).toHaveBeenCalledWith('verify_tier_admin', {
-      p_admin_key: 'personal-admin-key',
+    await expect(unlockBoardEditing('seed', '  personal-edit-key  ')).resolves.toBeUndefined()
+    expect(rpcMock).toHaveBeenCalledWith('verify_tier_board_key', {
+      p_board_id: 'seed',
+      p_edit_key: 'personal-edit-key',
     })
 
     const seed: TierBoard = {
@@ -113,19 +120,27 @@ describe('board ownership boundary', () => {
     })
 
     await saveBoard(seed)
-    expect(rpcMock).toHaveBeenLastCalledWith('admin_save_tier_board', expect.objectContaining({
+    expect(rpcMock).toHaveBeenLastCalledWith('key_save_tier_board', expect.objectContaining({
       p_board_id: seed.id,
-      p_admin_key: 'personal-admin-key',
+      p_edit_key: 'personal-edit-key',
       p_expected_updated_at: seed.updatedAt,
     }))
     expect(ensureSessionMock).not.toHaveBeenCalled()
   })
 
-  it('does not retain an invalid admin key', async () => {
+  it('does not retain an invalid board key', async () => {
     rpcMock.mockResolvedValue({ data: false, error: null })
 
-    await expect(unlockAdminEditing('wrong-key')).rejects.toThrow('관리자 키가 올바르지 않습니다.')
-    await expect(canEditBoard({ ownerId: null })).resolves.toBe(false)
+    await expect(unlockBoardEditing('board-a', 'wrong-key')).rejects.toThrow('수정 키가 올바르지 않습니다.')
+    await expect(canEditBoard({ id: 'board-a', ownerId: null })).resolves.toBe(false)
+    expect(rpcMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('does not use one board key to unlock another board', async () => {
+    rpcMock.mockResolvedValueOnce({ data: true, error: null })
+    await unlockBoardEditing('board-a', 'board-a-key')
+
+    await expect(canEditBoard({ id: 'board-b', ownerId: null })).resolves.toBe(false)
     expect(rpcMock).toHaveBeenCalledTimes(1)
   })
 })

@@ -3,8 +3,8 @@
 ## Source of truth
 
 - Status: Active
-- Last refreshed: 2026-09-02
-- Primary product surfaces: compact board list, board detail/editor, board creation, personal edit unlock
+- Last refreshed: 2026-09-03
+- Primary product surfaces: compact board list, board detail/editor, board creation, board-key edit unlock
 - Evidence reviewed: owner request for a mostly personal and less decorative tool, current production UI, mobile tests, Cloudflare/Supabase constraints
 
 ## Brand
@@ -15,7 +15,7 @@
 
 ## Product goals
 
-- Goals: open a board with minimal navigation; edit any personal board safely; make rankings readable at a glance; keep mobile editing unsurprising
+- Goals: open a board with minimal navigation; let anyone create without signup; edit a board safely with its chosen key; make rankings readable at a glance; keep mobile editing unsurprising
 - Non-goals: comments, follows, reactions, recommendation algorithms, poster scraping, real-time multi-user editing
 - Success signals: completed board creation, successful saves, copied share links, readable 320 px layout
 
@@ -53,7 +53,7 @@
 
 - Existing components to reuse: AppShell, BoardCard, TierTable, BoardEditor, TurnstileGate
 - New/changed components: compact home/shell, edit-key prompt, editor delete action
-- Variants and states: owner/admin/locked, saved/saving/error, empty/populated, selected/unselected entry
+- Variants and states: owner/key-holder/locked, saved/saving/error, empty/populated, selected/unselected entry
 - Token/component ownership: CSS custom properties in `src/index.css`; component-specific layout in `src/App.css`
 
 ## Accessibility
@@ -90,7 +90,7 @@
 - Framework/styling system: React + TypeScript + Vite; plain CSS; Supabase JS
 - Design-token constraints: one CSS variable layer, no component-library theme wrapper
 - Performance constraints: no image API; route chunks kept small; no background polling
-- Compatibility constraints: Cloudflare Pages SPA fallback; browser storage retains anonymous ownership and a successfully verified personal admin key
+- Compatibility constraints: Cloudflare Pages SPA fallback; browser storage retains anonymous ownership and successfully verified keys by board ID
 - Test/screenshot expectations: component flows plus desktop/mobile production screenshots and overflow checks
 
 ## Open questions

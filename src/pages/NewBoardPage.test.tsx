@@ -77,6 +77,8 @@ describe('NewBoardPage', () => {
     await user.clear(screen.getByRole('textbox', { name: '카테고리' }))
     await user.type(screen.getByRole('textbox', { name: '카테고리' }), '  영화  ')
     await user.type(screen.getByRole('textbox', { name: /한 줄 설명/ }), '  다시 보고 싶은 작품  ')
+    await user.type(screen.getByLabelText('수정 키'), 'personal-edit-key')
+    await user.type(screen.getByLabelText('수정 키 확인'), 'personal-edit-key')
     await user.click(screen.getByRole('button', { name: '보안 확인 완료' }))
     await user.click(screen.getByRole('button', { name: '티어표 만들기' }))
 
@@ -92,7 +94,22 @@ describe('NewBoardPage', () => {
         ]),
       }),
       'test-captcha-token',
+      'personal-edit-key',
     )
     expect(await screen.findByRole('heading', { name: '생성된 티어표' })).toBeInTheDocument()
+  })
+
+  it('does not create a board when the edit key confirmation differs', async () => {
+    const user = userEvent.setup()
+    renderPage()
+
+    await user.type(screen.getByRole('textbox', { name: '제목' }), '나의 영화')
+    await user.type(screen.getByLabelText('수정 키'), 'personal-edit-key')
+    await user.type(screen.getByLabelText('수정 키 확인'), 'different-edit-key')
+    await user.click(screen.getByRole('button', { name: '보안 확인 완료' }))
+
+    expect(screen.getByRole('button', { name: '티어표 만들기' })).toBeDisabled()
+    expect(screen.getByText('수정 키가 일치하지 않습니다.')).toBeInTheDocument()
+    expect(createBoardMock).not.toHaveBeenCalled()
   })
 })

@@ -5,17 +5,17 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { TierBoard } from '../lib'
 import { BoardPage } from './BoardPage'
 
-const { canEditBoardMock, getBoardBySlugMock, unlockAdminEditingMock } = vi.hoisted(() => ({
+const { canEditBoardMock, getBoardBySlugMock, unlockBoardEditingMock } = vi.hoisted(() => ({
   canEditBoardMock: vi.fn(),
   getBoardBySlugMock: vi.fn(),
-  unlockAdminEditingMock: vi.fn(),
+  unlockBoardEditingMock: vi.fn(),
 }))
 
 vi.mock('../lib', async (importOriginal) => ({
   ...await importOriginal<typeof import('../lib')>(),
   canEditBoard: canEditBoardMock,
   getBoardBySlug: getBoardBySlugMock,
-  unlockAdminEditing: unlockAdminEditingMock,
+  unlockBoardEditing: unlockBoardEditingMock,
 }))
 
 vi.mock('../components/BoardEditor', () => ({
@@ -42,7 +42,7 @@ describe('BoardPage personal edit unlock', () => {
   beforeEach(() => {
     canEditBoardMock.mockReset().mockResolvedValue(false)
     getBoardBySlugMock.mockReset().mockResolvedValue(board)
-    unlockAdminEditingMock.mockReset().mockResolvedValue(undefined)
+    unlockBoardEditingMock.mockReset().mockResolvedValue(undefined)
   })
 
   it('offers edit on a locked seed and opens the full editor after a valid key', async () => {
@@ -54,16 +54,16 @@ describe('BoardPage personal edit unlock', () => {
     )
 
     await user.click(await screen.findByRole('button', { name: '수정' }))
-    await user.type(screen.getByLabelText('관리자 키'), 'personal-admin-key')
+    await user.type(screen.getByLabelText('수정 키'), 'personal-edit-key')
     await user.click(screen.getByRole('button', { name: '잠금 해제' }))
 
-    expect(unlockAdminEditingMock).toHaveBeenCalledWith('personal-admin-key')
+    expect(unlockBoardEditingMock).toHaveBeenCalledWith('seed', 'personal-edit-key')
     expect(await screen.findByRole('heading', { name: '편집 화면' })).toBeInTheDocument()
   })
 
   it('keeps the key prompt open and shows a useful invalid-key error', async () => {
     const user = userEvent.setup()
-    unlockAdminEditingMock.mockRejectedValue(new Error('관리자 키가 올바르지 않습니다.'))
+    unlockBoardEditingMock.mockRejectedValue(new Error('수정 키가 올바르지 않습니다.'))
     render(
       <MemoryRouter initialEntries={['/t/space-movie-scores']}>
         <Routes><Route path="/t/:slug" element={<BoardPage />} /></Routes>
@@ -71,10 +71,10 @@ describe('BoardPage personal edit unlock', () => {
     )
 
     await user.click(await screen.findByRole('button', { name: '수정' }))
-    await user.type(screen.getByLabelText('관리자 키'), 'wrong-key')
+    await user.type(screen.getByLabelText('수정 키'), 'wrong-key')
     await user.click(screen.getByRole('button', { name: '잠금 해제' }))
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('관리자 키가 올바르지 않습니다.')
-    expect(screen.getByLabelText('관리자 키')).toBeInTheDocument()
+    expect(await screen.findByRole('alert')).toHaveTextContent('수정 키가 올바르지 않습니다.')
+    expect(screen.getByLabelText('수정 키')).toBeInTheDocument()
   })
 })

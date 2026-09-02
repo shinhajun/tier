@@ -3,9 +3,8 @@ import { chromium } from '@playwright/test'
 const baseUrl = process.env.PLAYWRIGHT_BASE_URL
 const supabaseUrl = process.env.VITE_SUPABASE_URL
 const publishableKey = process.env.VITE_SUPABASE_PUBLISHABLE_KEY
-const adminKey = process.env.TIER_ADMIN_KEY
 
-if (!baseUrl || !supabaseUrl || !publishableKey || !adminKey) {
+if (!baseUrl || !supabaseUrl || !publishableKey) {
   throw new Error('Production browser smoke environment is incomplete.')
 }
 
@@ -23,6 +22,7 @@ const page = await context.newPage()
 const suffix = Date.now().toString(36)
 const originalTitle = `배포 검증 ${suffix}`
 const editedTitle = `${originalTitle} 수정`
+const editKey = `edit-${suffix}-safe-key`
 let slug = ''
 
 async function waitUntilEnabled(locator, timeout = 30_000) {
@@ -38,6 +38,8 @@ try {
   await page.goto(new URL('/new', baseUrl).toString())
   await page.getByLabel('제목').fill(originalTitle)
   await page.getByLabel('카테고리').fill('검증')
+  await page.getByLabel('수정 키', { exact: true }).fill(editKey)
+  await page.getByLabel('수정 키 확인').fill(editKey)
 
   const create = page.getByRole('button', { name: '티어표 만들기' })
   await waitUntilEnabled(create)
@@ -52,10 +54,11 @@ try {
     for (const key of Object.keys(localStorage)) {
       if (key.endsWith('-auth-token')) localStorage.removeItem(key)
     }
+    localStorage.removeItem('tier.board-keys')
   })
   await page.reload()
   await page.getByRole('button', { name: '수정' }).click()
-  await page.getByLabel('관리자 키').fill(adminKey)
+  await page.getByLabel('수정 키').fill(editKey)
   await page.getByRole('button', { name: '잠금 해제' }).click()
   await page.getByRole('heading', { name: '티어표 수정' }).waitFor({ state: 'visible' })
   await page.getByRole('textbox', { name: '제목' }).fill(editedTitle)
@@ -85,7 +88,7 @@ try {
   slug = ''
 } finally {
   try {
-    if (slug) await page.evaluate(async ({ admin, key, slugToDelete, url }) => {
+    if (slug) await page.evaluate(async ({ edit, key, slugToDelete, url }) => {
       const headers = { apikey: key, Authorization: `Bearer ${key}` }
       const boardResponse = await fetch(
         `${url}/rest/v1/tier_boards?slug=eq.${encodeURIComponent(slugToDelete)}&select=id`,
@@ -95,10 +98,10 @@ try {
       const boards = await boardResponse.json()
       if (!boards[0]?.id) throw new Error('Cleanup could not find the created board.')
 
-      const deleteResponse = await fetch(`${url}/rest/v1/rpc/admin_delete_tier_board`, {
+      const deleteResponse = await fetch(`${url}/rest/v1/rpc/key_delete_tier_board`, {
         method: 'POST',
         headers: { ...headers, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ p_board_id: boards[0].id, p_admin_key: admin }),
+        body: JSON.stringify({ p_board_id: boards[0].id, p_edit_key: edit }),
       })
       if (!deleteResponse.ok) throw new Error(`Cleanup delete failed: ${deleteResponse.status}`)
 
@@ -108,10 +111,10 @@ try {
       )
       if (!verifyResponse.ok) throw new Error(`Cleanup verification failed: ${verifyResponse.status}`)
       if ((await verifyResponse.json()).length !== 0) throw new Error('Cleanup board still exists.')
-    }, { admin: adminKey, key: publishableKey, slugToDelete: slug, url: supabaseUrl })
+    }, { edit: editKey, key: publishableKey, slugToDelete: slug, url: supabaseUrl })
   } finally {
     await browser.close()
   }
 }
 
-console.log(JSON.stringify({ captchaAuth: true, create: true, adminEdit: true, adminDelete: true, cleanup: true }))
+console.log(JSON.stringify({ captchaAuth: true, create: true, keyEdit: true, keyDelete: true, cleanup: true }))

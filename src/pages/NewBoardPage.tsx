@@ -2,7 +2,7 @@ import { useCallback, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { ArrowDownIcon, ArrowLeftIcon, ArrowUpIcon, PlusIcon, TrashIcon } from '../components/Icons'
 import { TurnstileGate } from '../components/TurnstileGate'
-import { BOARD_LIMITS, createBoard, type BoardDraft, type RowDraft } from '../lib'
+import { BOARD_LIMITS, createBoard, EDIT_KEY_LIMITS, type BoardDraft, type RowDraft } from '../lib'
 
 const COLORS = ['#E26645', '#E9B949', '#A8B66B', '#5B9F8C', '#668DB8', '#8A78A8', '#8D8D86']
 
@@ -43,13 +43,21 @@ export function NewBoardPage() {
   const [selectedTemplate, setSelectedTemplate] = useState('score')
   const [status, setStatus] = useState<'idle' | 'saving' | 'error'>('idle')
   const [error, setError] = useState('')
+  const [editKey, setEditKey] = useState('')
+  const [editKeyConfirmation, setEditKeyConfirmation] = useState('')
   const [captchaToken, setCaptchaToken] = useState<string | null>(null)
   const [captchaResetKey, setCaptchaResetKey] = useState(0)
   const handleCaptchaToken = useCallback((token: string | null) => setCaptchaToken(token), [])
 
+  const keysMatch = editKey === editKeyConfirmation
   const isValid = useMemo(
-    () => draft.title.trim().length >= 2 && draft.rows.length >= 2 && draft.rows.every((row) => row.label.trim()),
-    [draft],
+    () => draft.title.trim().length >= 2
+      && draft.rows.length >= 2
+      && draft.rows.every((row) => row.label.trim())
+      && editKey.trim().length >= EDIT_KEY_LIMITS.min
+      && editKey.trim().length <= EDIT_KEY_LIMITS.max
+      && editKey === editKeyConfirmation,
+    [draft, editKey, editKeyConfirmation],
   )
 
   function applyTemplate(templateId: string) {
@@ -101,7 +109,7 @@ export function NewBoardPage() {
     setStatus('saving')
     setError('')
     try {
-      const board = await createBoard(draft, captchaToken)
+      const board = await createBoard(draft, captchaToken, editKey)
       navigate(`/t/${board.slug}`, { replace: true })
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : '티어표를 저장하지 못했습니다.')
@@ -206,6 +214,38 @@ export function NewBoardPage() {
           <button className="add-row-button" type="button" onClick={addRow} disabled={draft.rows.length >= BOARD_LIMITS.rows}>
             <PlusIcon /> 행 추가
           </button>
+        </fieldset>
+
+        <fieldset className="form-section">
+          <legend>수정 키</legend>
+          <div className="form-grid form-grid--keys">
+            <label className="field">
+              <span>수정 키</span>
+              <input
+                required
+                type="password"
+                autoComplete="new-password"
+                minLength={EDIT_KEY_LIMITS.min}
+                maxLength={EDIT_KEY_LIMITS.max}
+                value={editKey}
+                onChange={(event) => setEditKey(event.target.value)}
+              />
+            </label>
+            <label className="field">
+              <span>수정 키 확인</span>
+              <input
+                required
+                type="password"
+                autoComplete="new-password"
+                minLength={EDIT_KEY_LIMITS.min}
+                maxLength={EDIT_KEY_LIMITS.max}
+                value={editKeyConfirmation}
+                onChange={(event) => setEditKeyConfirmation(event.target.value)}
+              />
+            </label>
+          </div>
+          <p className="field-help">다른 기기에서 수정·삭제할 때 필요합니다. 잊지 않게 보관하세요.</p>
+          {editKeyConfirmation && !keysMatch ? <p className="form-error" role="alert">수정 키가 일치하지 않습니다.</p> : null}
         </fieldset>
 
         <div className="captcha-section">

@@ -2,10 +2,11 @@ export {
   canEditBoard,
   createBoard,
   deleteBoard,
+  EDIT_KEY_LIMITS,
   getBoardBySlug,
   listPublicBoards,
   saveBoard,
-  unlockAdminEditing,
+  unlockBoardEditing,
 } from './boards'
 export { getReadableTextColor } from './color'
 export {

@@ -4,7 +4,7 @@ import { BoardEditor } from '../components/BoardEditor'
 import { ArrowLeftIcon, EditIcon, ShareIcon } from '../components/Icons'
 import { ErrorState, LoadingState } from '../components/LoadState'
 import { TierTable } from '../components/TierTable'
-import { canEditBoard, getBoardBySlug, unlockAdminEditing, type TierBoard } from '../lib'
+import { canEditBoard, getBoardBySlug, unlockBoardEditing, type TierBoard } from '../lib'
 import { NotFoundPage } from './NotFoundPage'
 
 export function BoardPage() {
@@ -14,7 +14,7 @@ export function BoardPage() {
   const [editable, setEditable] = useState(false)
   const [editing, setEditing] = useState(false)
   const [unlocking, setUnlocking] = useState(false)
-  const [adminKey, setAdminKey] = useState('')
+  const [editKey, setEditKey] = useState('')
   const [unlockStatus, setUnlockStatus] = useState<'idle' | 'checking'>('idle')
   const [unlockError, setUnlockError] = useState('')
   const [status, setStatus] = useState<'loading' | 'ready' | 'missing' | 'error'>('loading')
@@ -76,15 +76,15 @@ export function BoardPage() {
 
   async function unlock(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    if (unlockStatus === 'checking') return
+    if (!board || unlockStatus === 'checking') return
     setUnlockStatus('checking')
     setUnlockError('')
     try {
-      await unlockAdminEditing(adminKey)
+      await unlockBoardEditing(board.id, editKey)
       setEditable(true)
       setUnlocking(false)
       setEditing(true)
-      setAdminKey('')
+      setEditKey('')
     } catch (caught) {
       setUnlockError(caught instanceof Error ? caught.message : '편집 잠금을 해제하지 못했습니다.')
     } finally {
@@ -142,18 +142,18 @@ export function BoardPage() {
       {unlocking ? (
         <form className="edit-unlock" onSubmit={unlock}>
           <label className="field">
-            <span>관리자 키</span>
+            <span>수정 키</span>
             <input
               autoFocus
               type="password"
               autoComplete="current-password"
-              value={adminKey}
-              onChange={(event) => setAdminKey(event.target.value)}
+              value={editKey}
+              onChange={(event) => setEditKey(event.target.value)}
             />
           </label>
           <div className="edit-unlock__actions">
             <button className="button button--ghost" type="button" onClick={() => setUnlocking(false)}>취소</button>
-            <button className="button button--ink" type="submit" disabled={!adminKey.trim() || unlockStatus === 'checking'}>
+            <button className="button button--ink" type="submit" disabled={!editKey.trim() || unlockStatus === 'checking'}>
               {unlockStatus === 'checking' ? '확인 중…' : '잠금 해제'}
             </button>
           </div>

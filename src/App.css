@@ -335,6 +335,17 @@
   grid-template-columns: 1.6fr 0.8fr;
 }
 
+.form-grid--keys {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.field-help {
+  margin: 10px 0 0;
+  color: var(--ink-soft);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
 .field {
   min-width: 0;
   display: grid;
@@ -938,6 +949,7 @@
   }
 
   .form-grid--title,
+  .form-grid--keys,
   .template-list,
   .editor-meta,
   .edit-unlock {
