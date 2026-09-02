@@ -1,0 +1,100 @@
+name: Verify and deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tier-production
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    env:
+      VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+      VITE_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY }}
+      VITE_TURNSTILE_SITE_KEY: ${{ secrets.VITE_TURNSTILE_SITE_KEY }}
+      SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Validate production configuration and seed API
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$VITE_SUPABASE_URL" == https://*.supabase.co ]]
+          [[ "$VITE_SUPABASE_PUBLISHABLE_KEY" == sb_publishable_* ]]
+          [[ "$VITE_TURNSTILE_SITE_KEY" == 0x* ]]
+          [[ "$SUPABASE_DB_URL" == postgresql://* ]]
+          response="$(curl --fail --silent --show-error --max-time 15 \
+            "$VITE_SUPABASE_URL/rest/v1/tier_boards?slug=eq.space-movie-scores&select=slug" \
+            -H "apikey: $VITE_SUPABASE_PUBLISHABLE_KEY" \
+            -H "Authorization: Bearer $VITE_SUPABASE_PUBLISHABLE_KEY")"
+          jq -e 'length == 1 and .[0].slug == "space-movie-scores"' <<< "$response" >/dev/null
+      - name: Verify live database authorization boundary
+        run: psql "$SUPABASE_DB_URL" -f scripts/smoke-database.sql
+      - name: Verify server-side CAPTCHA enforcement
+        run: npm run verify:captcha
+      - run: npm run lint
+      - run: npm test
+      - run: npm run build
+      - run: npm audit --omit=dev --audit-level=high
+      - run: ./scripts/verify-no-secrets.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: tier-dist
+          path: dist
+          if-no-files-found: error
+          retention-days: 7
+
+  deploy:
+    needs: verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: production
+    env:
+      VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+      VITE_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - uses: actions/download-artifact@v4
+        with:
+          name: tier-dist
+          path: dist
+      - name: Deploy Cloudflare Pages
+        run: npx wrangler@4 pages deploy dist --project-name tier --branch main --commit-dirty=true
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      - name: Production smoke
+        run: |
+          for attempt in {1..24}; do
+            if curl --fail --silent --show-error --max-time 15 https://tier.hajunshin.com/ | grep -q '<title>TIER'; then
+              break
+            fi
+            if [[ "$attempt" == 24 ]]; then exit 1; fi
+            sleep 5
+          done
+          curl --fail --silent --show-error --max-time 15 https://tier.hajunshin.com/t/space-movie-scores | grep -q '<title>TIER'
+          curl --fail --silent --show-error --head --max-time 15 https://tier.hajunshin.com/ | grep -qi 'x-content-type-options: nosniff'
+      - name: Production browser and data smoke
+        env:
+          PLAYWRIGHT_BASE_URL: https://tier.hajunshin.com
+        run: |
+          npx playwright test --project=desktop-chrome --grep "public movie board|Turnstile gate"
+          xvfb-run -a node scripts/smoke-browser-mutation.mjs
