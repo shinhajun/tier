@@ -42,9 +42,10 @@ try {
   await waitUntilEnabled(create)
   await create.click()
 
-  await page.getByRole('heading', { name: originalTitle }).waitFor({ state: 'visible' })
+  await page.waitForURL((url) => url.pathname.startsWith('/t/'))
   slug = new URL(page.url()).pathname.split('/').pop() ?? ''
   if (!slug) throw new Error('Created board URL did not include a slug.')
+  await page.getByRole('heading', { name: originalTitle }).waitFor({ state: 'visible' })
 
   await page.getByRole('button', { name: '편집' }).click()
   await page.getByRole('textbox', { name: '제목' }).fill(editedTitle)
@@ -60,8 +61,8 @@ try {
   await page.getByRole('heading', { name: editedTitle }).waitFor({ state: 'visible' })
   await page.getByText('연결 검증 항목').waitFor({ state: 'visible' })
 } finally {
-  if (slug) {
-    await page.evaluate(async ({ key, slugToDelete, url }) => {
+  try {
+    if (slug) await page.evaluate(async ({ key, slugToDelete, url }) => {
       const storageKey = Object.keys(localStorage).find((candidate) => candidate.endsWith('-auth-token'))
       const rawSession = storageKey ? localStorage.getItem(storageKey) : null
       const accessToken = rawSession ? JSON.parse(rawSession).access_token : null
@@ -90,8 +91,9 @@ try {
       if (!verifyResponse.ok) throw new Error(`Cleanup verification failed: ${verifyResponse.status}`)
       if ((await verifyResponse.json()).length !== 0) throw new Error('Cleanup board still exists.')
     }, { key: publishableKey, slugToDelete: slug, url: supabaseUrl })
+  } finally {
+    await browser.close()
   }
-  await browser.close()
 }
 
 console.log(JSON.stringify({ captchaAuth: true, create: true, edit: true, cleanup: true }))

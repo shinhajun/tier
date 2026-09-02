@@ -83,13 +83,16 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
       - name: Production smoke
         run: |
-          for attempt in {1..24}; do
-            if curl --fail --silent --show-error --max-time 15 https://tier.hajunshin.com/ | grep -q '<title>TIER'; then
+          ready=false
+          for attempt in $(seq 1 24); do
+            html="$(curl --fail --silent --show-error --max-time 15 https://tier.hajunshin.com/ || true)"
+            if [[ "$html" == *'<title>TIER'* ]]; then
+              ready=true
               break
             fi
-            if [[ "$attempt" == 24 ]]; then exit 1; fi
             sleep 5
           done
+          [[ "$ready" == true ]]
           curl --fail --silent --show-error --max-time 15 https://tier.hajunshin.com/t/space-movie-scores | grep -q '<title>TIER'
           curl --fail --silent --show-error --head --max-time 15 https://tier.hajunshin.com/ | grep -qi 'x-content-type-options: nosniff'
       - name: Production browser and data smoke
