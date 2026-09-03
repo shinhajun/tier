@@ -38,6 +38,7 @@
 - Color carries row identity, not surface decoration.
 - Editing is explicit: view and edit modes do not blur together.
 - Mobile uses tap targets and move controls; drag-and-drop is never the only path.
+- Creation stays near its destination: add rows above the row list and add items inside the target row.
 - Tradeoff: favor dense readable rows over poster-heavy cards.
 
 ## Visual language
@@ -52,7 +53,7 @@
 ## Components
 
 - Existing components to reuse: AppShell, BoardCard, TierTable, BoardEditor, TurnstileGate
-- New/changed components: compact home/shell, edit-key prompt, editor delete action
+- New/changed components: compact home/shell, edit-key prompt, row-local item creator, editor delete action
 - Variants and states: owner/key-holder/locked, saved/saving/error, empty/populated, selected/unselected entry
 - Token/component ownership: CSS custom properties in `src/index.css`; component-specific layout in `src/App.css`
 

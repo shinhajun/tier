@@ -37,7 +37,7 @@ export function BoardEditor({ board, onCancel, onDeleted, onSaved }: BoardEditor
   const [draft, setDraft] = useState<TierBoard>(() => structuredClone(board))
   const [newTitle, setNewTitle] = useState('')
   const [newScore, setNewScore] = useState('')
-  const [newRowId, setNewRowId] = useState(board.rows[0]?.id ?? '')
+  const [addingRowId, setAddingRowId] = useState<string | null>(null)
   const [quickAddError, setQuickAddError] = useState('')
   const [status, setStatus] = useState<'idle' | 'saving' | 'deleting' | 'error'>('idle')
   const [error, setError] = useState('')
@@ -84,7 +84,7 @@ export function BoardEditor({ board, onCancel, onDeleted, onSaved }: BoardEditor
           ? { ...current, items: [...current.items, ...movedItems] }
           : current)
     })
-    if (newRowId === row.id) setNewRowId(target.id)
+    if (addingRowId === row.id) setAddingRowId(target.id)
   }
 
   function addRow() {
@@ -99,7 +99,10 @@ export function BoardEditor({ board, onCancel, onDeleted, onSaved }: BoardEditor
         items: [],
       },
     ])
-    setNewRowId(id)
+    setAddingRowId(id)
+    setNewTitle('')
+    setNewScore('')
+    setQuickAddError('')
   }
 
   function updateItem(rowIndex: number, itemIndex: number, patch: Partial<TierItem>) {
@@ -133,7 +136,7 @@ export function BoardEditor({ board, onCancel, onDeleted, onSaved }: BoardEditor
 
   function addItem() {
     const title = newTitle.trim()
-    if (!title || !newRowId || itemCount >= BOARD_LIMITS.items) return
+    if (!title || !addingRowId || itemCount >= BOARD_LIMITS.items) return
     const numericScore = newScore.trim() === '' ? null : Number(newScore)
     if (numericScore !== null && !isValidTierScore(numericScore)) {
       setQuickAddError('점수는 0~10 사이에서 0.1 단위로 입력해 주세요.')
@@ -146,9 +149,16 @@ export function BoardEditor({ board, onCancel, onDeleted, onSaved }: BoardEditor
       score: numericScore,
       position: 0,
     }
-    setRows((rows) => rows.map((row) => row.id === newRowId
+    setRows((rows) => rows.map((row) => row.id === addingRowId
       ? { ...row, items: [...row.items, { ...item, position: row.items.length }] }
       : row))
+    setNewTitle('')
+    setNewScore('')
+    setQuickAddError('')
+  }
+
+  function toggleItemCreator(rowId: string) {
+    setAddingRowId((current) => current === rowId ? null : rowId)
     setNewTitle('')
     setNewScore('')
     setQuickAddError('')
@@ -203,68 +213,17 @@ export function BoardEditor({ board, onCancel, onDeleted, onSaved }: BoardEditor
         </label>
       </div>
 
-      <div className="quick-add">
-        <div className="quick-add__heading">
-          <strong>항목 추가</strong>
-          <span>제목만 입력해도 됩니다.</span>
-        </div>
-        <div className="quick-add__form" role="group" aria-label="새 항목">
-          <label className="field">
-            <span className="visually-hidden">항목 이름</span>
-            <input
-              value={newTitle}
-              maxLength={BOARD_LIMITS.itemTitle}
-              onChange={(event) => {
-                setNewTitle(event.target.value)
-                setQuickAddError('')
-              }}
-              onKeyDown={(event) => {
-                if (event.key === 'Enter') {
-                  event.preventDefault()
-                  addItem()
-                }
-              }}
-              placeholder="작품, 곡, 대상 이름"
-            />
-          </label>
-          <label className="field field--score">
-            <span className="visually-hidden">점수</span>
-            <input
-              value={newScore}
-              onChange={(event) => {
-                setNewScore(event.target.value)
-                setQuickAddError('')
-              }}
-              onKeyDown={(event) => {
-                if (event.key === 'Enter') {
-                  event.preventDefault()
-                  addItem()
-                }
-              }}
-              type="number"
-              min="0"
-              max="10"
-              step="0.1"
-              aria-describedby={quickAddError ? 'quick-add-error' : undefined}
-              placeholder="점수"
-            />
-          </label>
-          <label className="field">
-            <span className="visually-hidden">들어갈 행</span>
-            <select value={newRowId} onChange={(event) => setNewRowId(event.target.value)}>
-              {draft.rows.map((row) => <option value={row.id} key={row.id}>{row.label}</option>)}
-            </select>
-          </label>
-          <button
-            className="button button--ink"
-            type="button"
-            onClick={addItem}
-            disabled={!newTitle.trim() || (newScore.trim() !== '' && !isValidTierScore(Number(newScore)))}
-          >
-            <PlusIcon /> 추가
-          </button>
-        </div>
-        {quickAddError ? <p className="form-error" id="quick-add-error" role="alert">{quickAddError}</p> : null}
+      <div className="editor-rows__toolbar">
+        <h3>행과 항목</h3>
+        <button
+          className="add-row-button"
+          type="button"
+          onClick={addRow}
+          disabled={draft.rows.length >= BOARD_LIMITS.rows}
+          aria-label="새 행 만들기"
+        >
+          <PlusIcon /> 새 행
+        </button>
       </div>
 
       <div className="editor-rows">
@@ -276,13 +235,80 @@ export function BoardEditor({ board, onCancel, onDeleted, onSaved }: BoardEditor
                 <span className="visually-hidden">행 이름</span>
                 <input required maxLength={BOARD_LIMITS.rowLabel} value={row.label} onChange={(event) => updateRow(rowIndex, { label: event.target.value })} />
               </label>
-              <span>{row.items.length}개</span>
+              <button
+                className="row-add-button"
+                type="button"
+                onClick={() => toggleItemCreator(row.id)}
+                disabled={itemCount >= BOARD_LIMITS.items}
+                aria-expanded={addingRowId === row.id}
+                aria-label={`${row.label}에 항목 추가`}
+              >
+                <PlusIcon /> 항목 추가
+              </button>
               <div className="icon-actions">
                 <button type="button" onClick={() => moveRow(rowIndex, -1)} disabled={rowIndex === 0} aria-label={`${row.label} 위로 이동`}><ArrowUpIcon /></button>
                 <button type="button" onClick={() => moveRow(rowIndex, 1)} disabled={rowIndex === draft.rows.length - 1} aria-label={`${row.label} 아래로 이동`}><ArrowDownIcon /></button>
                 <button type="button" onClick={() => removeRow(rowIndex)} disabled={draft.rows.length <= 2} aria-label={`${row.label} 삭제`}><TrashIcon /></button>
               </div>
             </header>
+
+            {addingRowId === row.id ? (
+              <div className="row-item-creator" role="group" aria-label={`${row.label} 새 항목`}>
+                <label className="field">
+                  <span className="visually-hidden">새 항목 이름</span>
+                  <input
+                    value={newTitle}
+                    maxLength={BOARD_LIMITS.itemTitle}
+                    onChange={(event) => {
+                      setNewTitle(event.target.value)
+                      setQuickAddError('')
+                    }}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter') {
+                        event.preventDefault()
+                        addItem()
+                      }
+                    }}
+                    placeholder="새 항목 이름"
+                  />
+                </label>
+                <label className="field field--score">
+                  <span className="visually-hidden">새 항목 점수</span>
+                  <input
+                    value={newScore}
+                    onChange={(event) => {
+                      setNewScore(event.target.value)
+                      setQuickAddError('')
+                    }}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter') {
+                        event.preventDefault()
+                        addItem()
+                      }
+                    }}
+                    type="number"
+                    min="0"
+                    max="10"
+                    step="0.1"
+                    aria-describedby={quickAddError ? `quick-add-error-${row.id}` : undefined}
+                    placeholder="점수"
+                  />
+                </label>
+                <div className="row-item-creator__actions">
+                  <button className="button button--ghost" type="button" onClick={() => toggleItemCreator(row.id)}>닫기</button>
+                  <button
+                    className="button button--ink"
+                    type="button"
+                    onClick={addItem}
+                    disabled={!newTitle.trim() || (newScore.trim() !== '' && !isValidTierScore(Number(newScore)))}
+                    aria-label={`${row.label}에 추가`}
+                  >
+                    추가
+                  </button>
+                </div>
+                {quickAddError ? <p className="form-error" id={`quick-add-error-${row.id}`} role="alert">{quickAddError}</p> : null}
+              </div>
+            ) : null}
 
             <div className="editor-items">
               {row.items.map((item, itemIndex) => (
@@ -316,15 +342,11 @@ export function BoardEditor({ board, onCancel, onDeleted, onSaved }: BoardEditor
                   </div>
                 </article>
               ))}
-              {row.items.length === 0 ? <p className="editor-row__empty">위의 입력창에서 이 행에 항목을 추가하세요.</p> : null}
+              {row.items.length === 0 ? <p className="editor-row__empty">항목 추가를 눌러 첫 항목을 만드세요.</p> : null}
             </div>
           </section>
         ))}
       </div>
-
-      <button className="add-row-button" type="button" onClick={addRow} disabled={draft.rows.length >= BOARD_LIMITS.rows}>
-        <PlusIcon /> 행 추가
-      </button>
 
       {validationMessage ? <p className="form-error" role="alert">{validationMessage}</p> : null}
       {status === 'error' ? <p className="form-error" role="alert">{error}</p> : null}

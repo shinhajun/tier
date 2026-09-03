@@ -62,8 +62,9 @@ try {
   await page.getByRole('button', { name: '잠금 해제' }).click()
   await page.getByRole('heading', { name: '티어표 수정' }).waitFor({ state: 'visible' })
   await page.getByRole('textbox', { name: '제목' }).fill(editedTitle)
-  await page.getByPlaceholder('작품, 곡, 대상 이름').fill('연결 검증 항목')
-  await page.getByRole('button', { name: '추가', exact: true }).click()
+  await page.getByRole('button', { name: /에 항목 추가/ }).first().click()
+  await page.getByRole('textbox', { name: '새 항목 이름' }).fill('연결 검증 항목')
+  await page.getByRole('button', { name: /에 추가$/ }).click()
 
   const rowMoveTarget = await page.getByRole('combobox', { name: '행 이동' }).boundingBox()
   if (!rowMoveTarget || rowMoveTarget.height < 44) {

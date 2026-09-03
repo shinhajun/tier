@@ -72,6 +72,44 @@ describe('BoardEditor', () => {
     expect(within(rowSections[1] as HTMLElement).getByDisplayValue('인터스텔라')).toBeInTheDocument()
   })
 
+  it('creates a new item directly inside the selected row', async () => {
+    const user = userEvent.setup()
+    saveBoardMock.mockImplementation(async (input) => input)
+    render(<BoardEditor board={board()} onCancel={vi.fn()} onSaved={vi.fn()} />)
+
+    const firstRow = document.querySelectorAll('.editor-row')[0] as HTMLElement
+    await user.click(within(firstRow).getByRole('button', { name: '9점에 항목 추가' }))
+    await user.type(within(firstRow).getByRole('textbox', { name: '새 항목 이름' }), '컨택트')
+    await user.type(within(firstRow).getByRole('spinbutton', { name: '새 항목 점수' }), '8.5')
+    await user.click(within(firstRow).getByRole('button', { name: '9점에 추가' }))
+
+    expect(within(firstRow).getByDisplayValue('컨택트')).toBeInTheDocument()
+    expect(within(firstRow).getByDisplayValue('8.5')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: '변경 내용 저장' }))
+    expect(saveBoardMock).toHaveBeenCalledWith(expect.objectContaining({
+      rows: expect.arrayContaining([
+        expect.objectContaining({
+          id: 'nine',
+          items: expect.arrayContaining([
+            expect.objectContaining({ title: '컨택트', score: 8.5 }),
+          ]),
+        }),
+      ]),
+    }))
+  })
+
+  it('creates a new row from the row toolbar', async () => {
+    const user = userEvent.setup()
+    render(<BoardEditor board={board()} onCancel={vi.fn()} onSaved={vi.fn()} />)
+
+    await user.click(screen.getByRole('button', { name: '새 행 만들기' }))
+
+    const rows = document.querySelectorAll('.editor-row')
+    expect(rows).toHaveLength(3)
+    expect(within(rows[2] as HTMLElement).getByRole('textbox', { name: '행 이름' })).toHaveValue('새 행 3')
+    expect(within(rows[2] as HTMLElement).getByRole('group', { name: '새 행 3 새 항목' })).toBeInTheDocument()
+  })
+
   it('passes edited fields to the normalizing data boundary', async () => {
     const user = userEvent.setup()
     const onSaved = vi.fn()
@@ -116,11 +154,13 @@ describe('BoardEditor', () => {
     const user = userEvent.setup()
     render(<BoardEditor board={board()} onCancel={vi.fn()} onSaved={vi.fn()} />)
 
-    await user.type(screen.getByPlaceholderText('작품, 곡, 대상 이름'), '잘못된 점수')
-    await user.type(screen.getByPlaceholderText('점수'), '7.55')
+    const firstRow = document.querySelectorAll('.editor-row')[0] as HTMLElement
+    await user.click(within(firstRow).getByRole('button', { name: '9점에 항목 추가' }))
+    await user.type(within(firstRow).getByRole('textbox', { name: '새 항목 이름' }), '잘못된 점수')
+    await user.type(within(firstRow).getByRole('spinbutton', { name: '새 항목 점수' }), '7.55')
 
-    expect(screen.getByRole('button', { name: '추가' })).toBeDisabled()
-    expect(screen.queryByDisplayValue('잘못된 점수')).toBeInTheDocument()
+    expect(within(firstRow).getByRole('button', { name: '9점에 추가' })).toBeDisabled()
+    expect(within(firstRow).queryByDisplayValue('잘못된 점수')).toBeInTheDocument()
   })
 
   it('shows the shared validation reason instead of silently disabling save', async () => {
