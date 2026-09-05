@@ -32,7 +32,8 @@ test('public movie board is readable from the gallery', async ({ page }, testInf
   await page.goto('/')
   await expect(page.getByRole('heading', { name: '티어표' })).toBeVisible()
   await expect(page.getByLabel('티어표 예시')).toHaveCount(0)
-  await expect(page.getByRole('link', { name: /우주와 미래를 그린 영화/ })).toBeVisible()
+  const movieBoardLink = page.locator('a[href="/t/space-movie-scores"]')
+  await expect(movieBoardLink).toBeVisible()
   await expectNoHorizontalOverflow(page)
 
   await page.screenshot({
@@ -40,12 +41,40 @@ test('public movie board is readable from the gallery', async ({ page }, testInf
     fullPage: true,
   })
 
-  await page.getByRole('link', { name: /우주와 미래를 그린 영화/ }).click()
-  await expect(page.getByRole('heading', { name: '우주와 미래를 그린 영화' })).toBeVisible()
-  await expect(page.getByText('인터스텔라', { exact: true })).toBeVisible()
-  await expect(page.getByText('프로젝트 헤일메리', { exact: true })).toBeVisible()
-  await expect(page.getByText('스파이더맨: 브랜드 뉴 데이', { exact: true })).toBeVisible()
-  await expect(page.getByText('아바타: 불과 재', { exact: true })).toBeVisible()
+  // Board titles and items are user-editable; compare with current persisted data,
+  // not the original seed copy. Keep the stable slug as the navigation contract.
+  const boardResponse = page.waitForResponse((response) => {
+    const url = new URL(response.url())
+    return response.request().method() === 'GET'
+      && url.pathname === '/rest/v1/tier_boards'
+      && url.searchParams.get('slug') === 'eq.space-movie-scores'
+  })
+  await movieBoardLink.click()
+  const response = await boardResponse
+  expect(response.ok()).toBe(true)
+  const records = await response.json() as Array<{
+    title: string
+    tier_rows: Array<{
+      label: string
+      position: number
+      tier_items: Array<{ title: string; position: number }>
+    }>
+  }>
+  expect(records).toHaveLength(1)
+  const board = records[0]
+  expect(board.title.trim()).not.toBe('')
+  expect(board.tier_rows.length).toBeGreaterThan(0)
+  const rows = [...board.tier_rows].sort((a, b) => a.position - b.position)
+  const itemTitles = rows.flatMap((row) => [...row.tier_items]
+    .sort((a, b) => a.position - b.position)
+    .map((item) => item.title))
+  await expect(page).toHaveURL(/\/t\/space-movie-scores$/)
+  await expect(page.getByRole('heading', { name: board.title, exact: true })).toBeVisible()
+  await expect(page.locator('.tier-row__label')).toHaveText(rows.map((row) => row.label))
+  await expect(page.locator('.tier-item strong')).toHaveText(itemTitles)
+  await page.reload()
+  await expect(page.getByRole('heading', { name: board.title, exact: true })).toBeVisible()
+  await expect(page.locator('.tier-item strong')).toHaveText(itemTitles)
   await expectNoHorizontalOverflow(page)
 
   await page.screenshot({
@@ -98,5 +127,10 @@ test('Turnstile gate renders on the production creation route', async ({ page })
   test.skip(!externalBaseUrl, '운영 Turnstile 위젯 로드를 확인하는 배포 후 검증입니다.')
 
   await page.goto('/new')
-  await expect(page.locator('iframe[src*="challenges.cloudflare.com"]')).toBeVisible({ timeout: 15_000 })
+  // Turnstile can put its iframe in a closed shadow root. Check the rendered
+  // browser frame instead of depending on the provider's internal DOM layout.
+  await expect.poll(async () => {
+    const frame = page.frame({ url: /^https:\/\/challenges\.cloudflare\.com\// })
+    return frame ? await frame.locator('body').isVisible() : false
+  }, { timeout: 15_000 }).toBe(true)
 })

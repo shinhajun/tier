@@ -85,17 +85,17 @@ jobs:
         run: |
           ready=false
           for attempt in $(seq 1 24); do
-            html="$(curl --fail --silent --show-error --max-time 15 https://tier.hajunshin.com/ || true)"
-            if [[ "$html" == *'<meta name="tier-release" content="inline-create-v5"'* ]]; then
+            html="$(curl --fail --silent --show-error --max-time 15 https://tier.vada.so/ || true)"
+            if [[ "$html" == *'<meta name="tier-release" content="vada-hosting-v6"'* ]]; then
               ready=true
               break
             fi
             sleep 5
           done
           [[ "$ready" == true ]]
-          curl --fail --silent --show-error --max-time 15 https://tier.hajunshin.com/t/space-movie-scores | grep -q '<title>TIER'
-          curl --fail --silent --show-error --head --max-time 15 https://tier.hajunshin.com/ | grep -qi 'x-content-type-options: nosniff'
+          curl --fail --silent --show-error --max-time 15 https://tier.vada.so/t/space-movie-scores | grep -q '<title>TIER'
+          curl --fail --silent --show-error --head --max-time 15 https://tier.vada.so/ | grep -qi 'x-content-type-options: nosniff'
       - name: Production browser and data smoke
         env:
-          PLAYWRIGHT_BASE_URL: https://tier.hajunshin.com
+          PLAYWRIGHT_BASE_URL: https://tier.vada.so
         run: npx playwright test --project=desktop-chrome --grep "public movie board"

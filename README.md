@@ -2,7 +2,7 @@
 
 개인적으로 자주 열고 바로 수정하는 모바일 우선 티어표입니다.
 
-- Production: <https://tier.hajunshin.com>
+- Production: <https://tier.vada.so>
 - Seed board: `/t/space-movie-scores`
 - Stack: React 19, TypeScript, Vite, Supabase, Cloudflare Pages
 
@@ -51,7 +51,7 @@ npm run test:e2e
 npm run smoke:db
 npm run verify:captcha
 psql "$SUPABASE_DB_URL" -f scripts/smoke-database.sql
-PLAYWRIGHT_BASE_URL=https://tier.hajunshin.com xvfb-run -a node --env-file-if-exists=.env.local scripts/smoke-browser-mutation.mjs
+PLAYWRIGHT_BASE_URL=https://tier.vada.so xvfb-run -a node --env-file-if-exists=.env.local scripts/smoke-browser-mutation.mjs
 npm audit --omit=dev
 ./scripts/verify-no-secrets.sh
 ```
@@ -59,7 +59,7 @@ npm audit --omit=dev
 `npm run test:e2e`는 desktop Chrome, 390×844 mobile Chrome, 320×568 Chrome, mobile WebKit에서 간결한 목록·공개 영화 표·직접 URL·44px 터치 대상·긴 입력값 오버플로·행 편집 컨트롤을 검사합니다. `scripts/smoke-database.sql`은 운영 DB 트랜잭션을 롤백하며 소유자·표별 키·복구 관리자 쓰기, 잘못된 키 거부, 직접 쓰기 차단, payload rollback, 충돌, 삭제를 검증합니다. `npm run verify:captcha`는 token이 없는 익명 가입을 운영 Auth가 거부하는지 검사합니다. `smoke-browser-mutation.mjs`는 실제 Turnstile로 표와 수정 키를 만든 뒤 소유자 세션과 저장된 키를 제거하고, 같은 키를 다시 입력해 수정·삭제·미존재 확인까지 실행합니다. Cloudflare는 호스팅 사업자 IP의 자동 위젯 해결을 차단할 수 있으므로 이 양성 경로는 신뢰 가능한 운영자 환경에서 실행합니다. `npm run smoke:db`는 CAPTCHA를 켜기 전의 실제 익명 Auth 통합 호출에 사용합니다. 배포된 사이트를 검사하려면:
 
 ```bash
-PLAYWRIGHT_BASE_URL=https://tier.hajunshin.com npm run test:e2e
+PLAYWRIGHT_BASE_URL=https://tier.vada.so npm run test:e2e
 ```
 
 ## Database
@@ -83,14 +83,18 @@ PLAYWRIGHT_BASE_URL=https://tier.hajunshin.com npm run test:e2e
 
 ## Deployment
 
+`vada.so`를 관리하는 Cloudflare 계정의 Pages `tier` 프로젝트가 `tier.vada.so`를 서비스합니다. GitHub 배포 토큰은 해당 계정의 Pages Write 권한으로 제한합니다.
+
 `main` push 시 `.github/workflows/deploy.yml`이 다음을 실행합니다.
 
 1. Supabase/Turnstile 환경값 및 운영 seed REST 검증
-2. lint, unit/component tests, production build
-3. dependency audit와 tracked/untracked candidate secret scan
-4. Cloudflare Pages `tier` 프로젝트 배포
-5. 롤백 트랜잭션으로 운영 DB의 소유권·검증·충돌 경계 검사
-6. `tier.hajunshin.com`의 HTML, SPA deep link, 보안 헤더와 공개 브라우저 seed 로드 검사
+2. 롤백 트랜잭션으로 운영 DB의 소유권·검증·충돌 경계 및 서버 측 CAPTCHA 강제 검사
+3. lint, unit/component tests, production build
+4. dependency audit와 tracked/untracked candidate secret scan
+5. Cloudflare Pages `tier` 프로젝트 배포
+6. `tier.vada.so`의 HTML, SPA deep link, 보안 헤더와 공개 브라우저 seed 로드 검사
+
+공개 브라우저 검사는 고정 slug로 이동한 뒤 현재 DB 응답의 제목·행·항목과 화면을 비교하므로, 사용자가 영화표 내용을 바꿔도 초기 예시 문구 때문에 배포가 실패하지 않습니다. Turnstile 렌더링 검사는 위젯의 내부 DOM 대신 실제 challenge frame을 확인합니다.
 
 실제 Turnstile→Supabase 익명 Auth→표별 키 unlock→수정→삭제 경로는 위의 `smoke-browser-mutation.mjs` 명령으로 신뢰 가능한 운영자 환경에서 별도 수행합니다. CI는 token 없는 가입 거부, 소유자·표별 키·복구 관리자 데이터베이스 권한 경계와 공개 운영 화면을 계속 자동 검증합니다.
 
@@ -102,6 +106,14 @@ GitHub encrypted secrets:
 - `VITE_SUPABASE_PUBLISHABLE_KEY`
 - `VITE_TURNSTILE_SITE_KEY`
 - `SUPABASE_DB_URL` (CI에서 rollback 통합 검사에만 사용)
+
+### 도메인 이전 — 2026-09-06
+
+- 새 Pages 기본 주소: `tier-5vk.pages.dev`; DNS는 `tier.vada.so` → 해당 주소의 CNAME입니다.
+- 기존 `tier.hajunshin.com`과 이전 계정의 Pages 배포는 호환용으로 유지합니다. 이후 `main` 자동 배포는 새 계정에만 반영됩니다.
+- Supabase 데이터·표별 수정 키·공유 Auth 설정은 변경하지 않습니다. 도메인이 바뀌면 브라우저에 저장된 세션과 키는 넘어오지 않으므로 기존 수정 키를 한 번 다시 입력합니다.
+- Turnstile은 기존 위젯과 서버 secret을 유지하고 `tier.vada.so`, `tier-5vk.pages.dev`를 허용 hostname에 추가합니다. 위젯은 이전 Cloudflare 계정에 남아 있으며, 공유 Supabase CAPTCHA secret을 바꾸지 않기 위한 구성입니다.
+- 장애 시 이전 주소로 접근할 수 있습니다. CI를 이전 계정으로 되돌리려면 배포 관련 GitHub secrets 두 개와 운영 smoke URL을 함께 복원합니다. 자격증명 위치와 이전 계정 정보는 Obsidian 중앙 자격증명 노트에서 확인합니다.
 
 ## Design contract
 
